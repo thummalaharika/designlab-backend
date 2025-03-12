@@ -22,4 +22,5 @@ urlpatterns = [
     path("history/", HistoryApi.as_view()),
     path("login/", LoginAPI.as_view()),
     path('signup/', SignupAPI.as_view()),
+    path('ipscan/', IPScannerAPI.as_view()),
 ]
