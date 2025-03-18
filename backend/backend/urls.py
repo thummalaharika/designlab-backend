@@ -23,4 +23,6 @@ urlpatterns = [
     path("login/", LoginAPI.as_view()),
     path('signup/', SignupAPI.as_view()),
     path('ipscan/', IPScannerAPI.as_view()),
+    path('generateotp/', OTPGenerateView.as_view(), name='otp-generate'),
+    path('verifyotp/', OTPVerifyView.as_view(), name='otp-verify'),
 ]

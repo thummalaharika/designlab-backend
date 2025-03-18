@@ -10,6 +10,14 @@ import nmap
 import ipaddress
 from rest_framework.exceptions import ValidationError
 from rest_framework import status
+from rest_framework.permissions import AllowAny
+from .models import OTP
+from .serializers import OTPGenerateSerializer, OTPVerifySerializer
+from rest_framework import status, generics
+from django.contrib.auth.models import User
+from django.conf import settings
+from django.core.mail import send_mail
+
 
 # token 676fae567111834d79a4a69553a291c44e70379a
 # Create your views here.
@@ -168,3 +176,60 @@ class IPScannerAPI(APIView):
                 "status": False,
                 "message": f"An error occurred: {str(e)}"
             }, status=500)
+        
+
+class OTPGenerateView(generics.CreateAPIView):
+    queryset = OTP.objects.all()
+    serializer_class = OTPGenerateSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+
+        try:
+            user = User.objects.get(email=email)  # Fetch user using email
+        except User.DoesNotExist:
+            return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Generate a random 6-digit OTP
+        otp_code = random.randint(100000, 999999)
+
+        # Save OTP in the database
+        OTP.objects.create(user=user, otp_code=otp_code)
+
+        # Send OTP via email
+        subject = "Your OTP Code"
+        message = f"Hello {user.username},\n\nYour OTP code is: {otp_code}\n\nDo not share this code with anyone."
+        sender_email = settings.EMAIL_HOST_USER  # Replace with your email
+        recipient_email = [user.email]
+
+        send_mail(subject, message, sender_email, recipient_email, fail_silently=False)
+
+        return Response({"message": "OTP sent successfully via email"}, status=status.HTTP_201_CREATED)
+
+
+class OTPVerifyView(generics.GenericAPIView):
+    serializer_class = OTPVerifySerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+        otp_code = request.data.get('otp_code')
+
+        try:
+            user = User.objects.get(email=email)  # Fetch user using email
+        except User.DoesNotExist:
+            return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        otp = OTP.objects.filter(user=user, otp_code=otp_code).first()
+
+        if otp :
+            otp.delete()  # Delete OTP after successful verification
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                "message": "OTP verified successfully",
+                "token": str(token),
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Invalid or expired OTP"}, status=status.HTTP_400_BAD_REQUEST)
