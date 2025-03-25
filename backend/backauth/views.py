@@ -23,11 +23,14 @@ import re
 import os
 import json
 import requests
+from dotenv import load_dotenv
 
+load_dotenv("path/to/.env")
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 NVD_RATE_LIMIT = 50  # Max 50 CVEs per 30 seconds
 NVD_SLEEP_TIME = 30  # Wait 30 seconds after hitting the limit
 NVD_API_KEY = os.getenv("NVD_API_KEY")
+# print(NVD_API_KEY)
 
 # token 676fae567111834d79a4a69553a291c44e70379a
 # Create your views here.
@@ -284,6 +287,7 @@ class IPScannerAPI(APIView):
     def post(self, request):
         data = request.data
         ip_address = data.get('ip_address')
+        print(NVD_API_KEY)
         
         if not ip_address:
             return Response({
