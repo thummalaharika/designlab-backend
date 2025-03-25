@@ -1,0 +1,16 @@
+.env
+env/
+
+__pycache_/
+db.sqlite3
+*.sqlite3
+*.log
+
+# Migrations (optional, but usually kept)
+**/migrations/**
+
+# MacOS system files
+.DS_Store
+
+# Temp files
+tempCodeRunnerFile.py
