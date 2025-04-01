@@ -23,14 +23,14 @@ import re
 import os
 import json
 import requests
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
-NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-NVD_RATE_LIMIT = 50  # Max 50 CVEs per 30 seconds
-NVD_SLEEP_TIME = 30  # Wait 30 seconds after hitting the limit
-NVD_API_KEY = os.getenv("NVD_API_KEY")
+CVEDB_API_URL = "https://cvedb.shodan.io/cve/"
+# NVD_RATE_LIMIT = 50  # Max 50 CVEs per 30 seconds
+# NVD_SLEEP_TIME = 30  # Wait 30 seconds after hitting the limit
+# NVD_API_KEY = os.getenv("NVD_API_KEY")
 # print (NVD_API_KEY)
 
 # token 676fae567111834d79a4a69553a291c44e70379a
@@ -132,28 +132,7 @@ def validate_ip_addr(ip):
         return False
 
 
-# def scan_vulnerabilities(ip):
-    scanner = nmap.PortScanner()
-    scanner.scan(ip, arguments='-sV --script vulners')
-    results = []
-    
-    for host in scanner.all_hosts():
-        for proto in scanner[host].all_protocols():
-            ports = scanner[host][proto].keys()
-            
-            for port in ports:
-                service = scanner[host][proto][port]
-                vulners_output = service.get('script', {}).get('vulners', 'No vulnerabilities found')
-                
-                results.append({
-                    'port': port,
-                    'service': service.get('name', ''),
-                    'product': service.get('product', ''),
-                    'version': service.get('version', ''),
-                    'vulnerabilities': vulners_output
-                })
-    
-    return results
+
 
 #### NEW CODE BEGINNING ####
 def fetch_cve_details(cve_id):
@@ -162,31 +141,27 @@ def fetch_cve_details(cve_id):
     :param cve_id: CVE ID to fetch details for.
     :return: Dictionary containing description and CVSS score.
     """
-    url = f"{NVD_API_URL}?cveId={cve_id}"
-    headers = {"apiKey": NVD_API_KEY}
+    url = f"{CVEDB_API_URL}{cve_id}"
+    # headers = {"apiKey": NVD_API_KEY}
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url)
         response.raise_for_status()  # Raise an error for HTTP issues
         data = response.json()
 
-        if "vulnerabilities" in data and data["vulnerabilities"]:
-            cve = data["vulnerabilities"][0].get("cve", {})
+        if "cve_id" in data:
+            cve = data.get("cve_id", {})
 
             # Extract description
-            description = cve.get("descriptions", [{}])[0].get("value", "No description available")
+            description = data.get("summary", {"No description available"})
 
             # Extract CVSS score (try CVSSv3 first, then fallback to CVSSv2)
-            cvss_metrics = cve.get("metrics", {})
+
             cvss_score = None
 
-            if "cvssMetricV31" in cvss_metrics:
-                cvss_score = cvss_metrics["cvssMetricV31"][0]["cvssData"]["baseScore"]
-            elif "cvssMetricV30" in cvss_metrics:
-                cvss_score = cvss_metrics["cvssMetricV30"][0]["cvssData"]["baseScore"]
-            elif "cvssMetricV2" in cvss_metrics:
-                cvss_score = cvss_metrics["cvssMetricV2"][0]["cvssData"]["baseScore"]
-
+            if "cvss" in data:
+                cvss_score = data.get("cvss")
+            
             return {
                 "description": description,
                 "cvss_score": cvss_score if cvss_score is not None else "Unknown"
@@ -253,26 +228,18 @@ def scan_vulnerabilities(ip):
                     except Exception as e:
                         print(f"Error processing vulnerabilities on port {port}: {str(e)}")
 
-        # **Process CVEs in batches of 50 to follow rate limits**
-        for i in range(0, len(all_cves), NVD_RATE_LIMIT):
-            batch = all_cves[i:i + NVD_RATE_LIMIT]
-
-            for cve_id in batch:
-                cve_details = fetch_cve_details(cve_id)
-
-                # **Update vulnerabilities with CVE details**
-                for vuln in vulnerabilities:
-                    if vuln["vuln_id"] == cve_id:
-                        vuln["Description"] = cve_details.get("description")  # ✅ Correctly updating details
-                        vuln["CVSS_Score"] = cve_details.get("cvss_score")  # ✅ Correctly updating details
-                        print(cve_id)
-                        print(cve_details)
-                        print('\n')
-
-            # **Wait 30 seconds if more than 50 CVEs**
-            if i + NVD_RATE_LIMIT < len(all_cves):
-                print(f"Rate limit reached. Sleeping for {NVD_SLEEP_TIME} seconds...")
-                time.sleep(NVD_SLEEP_TIME)
+        # **Process CVEs**
+        for cve_id in all_cves:
+            cve_details = fetch_cve_details(cve_id)
+            
+            # **Update vulnerabilities with CVE details**
+            for vuln in vulnerabilities:
+                if vuln["vuln_id"] == cve_id:
+                    vuln["Description"] = cve_details.get("description")  # ✅ Correctly updating details
+                    vuln["CVSS_Score"] = cve_details.get("cvss_score")  # ✅ Correctly updating details
+                    print(cve_id)
+                    print(cve_details)
+                    print('\n')
 
     except Exception as e:
         print(f"Error scanning vulnerabilities for {ip}: {str(e)}")
