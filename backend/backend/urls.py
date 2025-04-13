@@ -25,4 +25,5 @@ urlpatterns = [
     path('ipscan/', IPScannerAPI.as_view()),
     path('generateotp/', OTPGenerateView.as_view(), name='otp-generate'),
     path('verifyotp/', OTPVerifyView.as_view(), name='otp-verify'),
+    path('reset/', ResetPasswordAPI.as_view(), name='reset'),
 ]

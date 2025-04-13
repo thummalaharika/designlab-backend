@@ -66,7 +66,7 @@ class LoginAPI(APIView):
             print("login successful")
             return Response({
                 "status":True,
-                "data":{'token':str(token)}
+                "data":{'token':str(token),'username':username}
             })
         
 
@@ -117,10 +117,38 @@ class SignupAPI(APIView):
             "status": True,
             "message": "User created successfully!",
             "data": {
-                "token": str(token)
+                "token": str(token),
+                "username": username
             }
         })
 
+class ResetPasswordAPI(APIView):
+    def post(self, request):
+        token_key = request.data.get('token')
+        new_password = request.data.get('password')
+
+        if not token_key or not new_password:
+            return Response({
+                "status": False,
+                "message": "Token and new password are required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            token = Token.objects.get(key=token_key)
+            user = token.user
+        except Token.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": "Invalid token."
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({
+            "status": True,
+            "message": "Password has been reset successfully."
+        }, status=status.HTTP_200_OK)
 
 # Utility function to validate IP
 
@@ -442,6 +470,7 @@ class OTPGenerateView(generics.CreateAPIView):
 
         try:
             user = User.objects.get(email=email)  # Fetch user using email
+            print("user exists")
         except User.DoesNotExist:
             return Response({"error": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -484,6 +513,7 @@ class OTPVerifyView(generics.GenericAPIView):
             return Response({
                 "message": "OTP verified successfully",
                 "token": str(token),
+                "username": user.username
             }, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Invalid or expired OTP"}, status=status.HTTP_400_BAD_REQUEST)
